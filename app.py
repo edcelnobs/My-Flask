@@ -1,34 +1,66 @@
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-import streamlit as st
+from flask import Flask, request, render_template, redirect, url_for
+from werkzeug.utils import secure_filename
 import numpy as np
+import os
+from PIL import Image
 
-st.header('Potato Image Disease Classification Model')
+app = Flask(__name__)
 
 # Load the pre-trained Keras model
-model_path = 'modelp.keras'
+model_path = 'C:/Users/Edz/Desktop/Keras-mod/mod2/modelp.keras'
 model = load_model(model_path)
 
 # Define the categories
 data_cat = ['Potato___Early_blight', 'Potato___Late_blight', 'Potato___healthy']
 img_height, img_width = 180, 180
 
-# Upload an image using Streamlit file uploader
-image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+# Define the upload folder
+UPLOAD_FOLDER = 'uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-if image is not None:
-    # Load and preprocess the image for prediction
-    image_load = tf.keras.preprocessing.image.load_img(image, target_size=(img_height, img_width))
-    img_arr = tf.keras.preprocessing.image.img_to_array(image_load)
-    img_bat = np.expand_dims(img_arr, axis=0)
+@app.route('/', methods=['GET', 'POST'])
+def upload_file():
+    if request.method == 'POST':
+        # Check if the post request has the file part
+        if 'file' not in request.files:
+            return redirect(request.url)
+        file = request.files['file']
+        # If the user does not select a file, the browser submits an empty file without a filename
+        if file.filename == '':
+            return redirect(request.url)
+        if file:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Load and preprocess the image for prediction
+            with Image.open(filepath) as image_load:
+                image_load = image_load.resize((img_height, img_width))
+                img_arr = np.array(image_load)
+                img_bat = np.expand_dims(img_arr, axis=0)
+                
+                # Ensure the image has 3 color channels
+                if img_bat.shape[-1] == 1:
+                    img_bat = np.repeat(img_bat, 3, axis=-1)
+                elif img_bat.shape[-1] != 3:
+                    raise ValueError("Image must have 1 or 3 color channels")
+                
+                # Make predictions
+                predict = model.predict(img_bat)
+                score = tf.nn.softmax(predict[0])
 
-    # Make predictions
-    predict = model.predict(img_bat)
-    score = tf.nn.softmax(predict[0])
+                # Display the prediction result
+                result = {
+                    'filename': filename,
+                    'prediction': data_cat[np.argmax(score)],
+                    'accuracy': f'{np.max(score) * 100:.2f}%'
+                }
+                return render_template('result.html', result=result)
+    return render_template('index.html')
 
-    # Display the uploaded image
-    st.image(image, caption='Uploaded Image', use_column_width=True)
-
-    # Display the prediction result
-    st.write('Potato Disease Predicted: ' + data_cat[np.argmax(score)])
-    st.write(f'With accuracy: {np.max(score) * 100:.2f}%')
+if __name__ == '__main__':
+    # Ensure the upload folder exists
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    app.run(debug=True)

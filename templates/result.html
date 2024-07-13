@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Prediction Result</title>
+  </head>
+  <body>
+    <h1>Prediction Result</h1>
+    <p>Filename: {{ result.filename }}</p>
+    <p>Potato Disease Predicted: {{ result.prediction }}</p>
+    <p>With accuracy: {{ result.accuracy }}</p>
+    <a href="/">Upload another image</a>
+    <img src="/uploads{{result.filename }}" alt="Uploaded image">
+  </body>
+</html>
